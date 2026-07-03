@@ -52,6 +52,24 @@ A GitHub Actions workflow is included at `.github/workflows/docker-publish.yml`.
 - `ghcr.io/${{ github.repository_owner }}/test-cmr-website:latest`
 - `ghcr.io/${{ github.repository_owner }}/test-cmr-website:${{ github.sha }}
 
+### Fly.io deployment
+
+A Fly.io deployment workflow is included at `.github/workflows/fly-deploy.yml`. To use it, add these GitHub repository secrets:
+
+- `FLY_API_TOKEN` — Fly.io API token
+- `FLY_APP_NAME` — Fly app name (defaults to `test-cmr-website` if unset)
+- `GHCR_USERNAME` — GitHub username (if the image is private)
+- `GHCR_TOKEN` — GitHub token or PAT for GHCR access (if the image is private)
+
+Before using the workflow, create the Fly app and a persistent volume for JSON storage:
+
+```bash
+flyctl apps create test-cmr-website --region your-region
+flyctl volumes create dashboard-json --region your-region --size 1
+```
+
+The app configuration is stored in `fly.toml`, and the volume is mounted into `/app/dashboard-app/json`.
+
 ### Self-hosted Docker deployment
 
 This workflow also supports deploying to a self-hosted Docker host via SSH. To enable it, add the following repository secrets in GitHub:
