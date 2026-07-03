@@ -45,6 +45,15 @@ Then open `http://localhost:3001`.
 
 Because this project includes an Express backend, the simplest deployment paths are container-friendly hosts such as Render, Railway, or any Docker-compatible service.
 
+### GitHub Actions + GHCR
+
+A GitHub Actions workflow is included at `.github/workflows/docker-publish.yml`. On every push to `main`, it builds the Docker image and pushes it to GitHub Container Registry as:
+
+- `ghcr.io/${{ github.repository_owner }}/test-cmr-website:latest`
+- `ghcr.io/${{ github.repository_owner }}/test-cmr-website:${{ github.sha }}
+
+If you want a full deployment, connect that container image to any Docker host or managed service.
+
 If you want to deploy on a platform that supports containers, use the included `Dockerfile`.
 
 ## Notes
