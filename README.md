@@ -52,6 +52,29 @@ A GitHub Actions workflow is included at `.github/workflows/docker-publish.yml`.
 - `ghcr.io/${{ github.repository_owner }}/test-cmr-website:latest`
 - `ghcr.io/${{ github.repository_owner }}/test-cmr-website:${{ github.sha }}
 
+### Self-hosted Docker deployment
+
+This workflow also supports deploying to a self-hosted Docker host via SSH. To enable it, add the following repository secrets in GitHub:
+
+- `SSH_HOST` — hostname or IP of your Docker host
+- `SSH_USERNAME` — SSH user
+- `SSH_PRIVATE_KEY` — private key contents for SSH login
+- `REMOTE_JSON_DIR` — host directory to persist JSON files
+- `SSH_PORT` — optional SSH port (default is `22`)
+- `GHCR_USERNAME` — GitHub username for container registry authentication (optional if the image is public)
+- `GHCR_TOKEN` — PAT or token for GHCR login (optional if the image is public)
+
+The deployment step will:
+
+1. create the remote JSON directory if needed
+2. pull the latest image from GHCR
+3. stop and remove any existing `crm-dashboard` container
+4. run a new container with:
+   - port `3001` exposed
+   - `REMOTE_JSON_DIR` mounted into `/app/dashboard-app/json`
+
+Make sure Docker is installed on the target host and that port `3001` is available.
+
 If you want a full deployment, connect that container image to any Docker host or managed service.
 
 If you want to deploy on a platform that supports containers, use the included `Dockerfile`.

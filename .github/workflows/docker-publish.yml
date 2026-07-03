@@ -40,3 +40,33 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/test-cmr-website:latest
             ghcr.io/${{ github.repository_owner }}/test-cmr-website:${{ github.sha }}
+
+  deploy-self-host:
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SSH_HOST != '' && secrets.SSH_USERNAME != '' && secrets.SSH_PRIVATE_KEY != '' && secrets.REMOTE_JSON_DIR != '' }}
+
+    steps:
+      - name: Deploy to self-hosted Docker host
+        uses: appleboy/ssh-action@v0.1.8
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            mkdir -p "${{ secrets.REMOTE_JSON_DIR }}"
+            if [ -n "${GHCR_USERNAME}" ] && [ -n "${GHCR_TOKEN}" ]; then
+              echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+            fi
+            docker pull ghcr.io/${{ github.repository_owner }}/test-cmr-website:latest
+            docker rm -f crm-dashboard || true
+            docker run -d \
+              --name crm-dashboard \
+              --restart unless-stopped \
+              -p 3001:3001 \
+              -v "${{ secrets.REMOTE_JSON_DIR }}:/app/dashboard-app/json" \
+              ghcr.io/${{ github.repository_owner }}/test-cmr-website:latest
+        env:
+          GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
+          GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
