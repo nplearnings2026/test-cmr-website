@@ -11,7 +11,8 @@ const getCurrentFiscalYear = () => {
   const d = new Date();
   return d.getMonth() >= 3 ? String(d.getFullYear()) : String(d.getFullYear() - 1);
 };
-const CURRENT_YEAR = getCurrentFiscalYear();
+const currentFiscalYear = getCurrentFiscalYear();
+const fiscalLabel = y => `FY ${y}-${String(Number(y) + 1).slice(-2)}`;
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const round1 = n => Math.round(n * 10) / 10;
 
@@ -21,7 +22,7 @@ export default function App() {
   const [loading,   setLoading]     = useState(true);
   const [error,     setError]       = useState(null);
   const [updatedAt, setUpdatedAt]   = useState(null);
-  const [selYear,   setSelYear]     = useState(CURRENT_YEAR);
+  const [selYear,   setSelYear]     = useState(currentFiscalYear);
   const [selMonth,  setSelMonth]    = useState('');
   const [theme,     setTheme]       = useState(() => localStorage.getItem('dash-theme') || 'dark');
   const [fullData,  setFullData]    = useState(null);
@@ -138,7 +139,7 @@ export default function App() {
           <h1>Manufacturing Operations Dashboard</h1>
           {filtered && (
             <p className="subtitle">
-              Production &amp; sales &bull; {filtered.summary.date_range.from} – {filtered.summary.date_range.to}
+              Production &amp; sales &bull; {selYear ? fiscalLabel(selYear) : `${filtered.summary.date_range.from} – ${filtered.summary.date_range.to}`}
               &bull; {filtered.summary.date_range.days} days &bull; {filtered.summary.date_range.months} months
             </p>
           )}
