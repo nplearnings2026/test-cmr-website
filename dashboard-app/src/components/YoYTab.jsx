@@ -1,10 +1,16 @@
 import { Bar, Line } from 'react-chartjs-2';
 import { fmt, P, getChartTheme } from '../utils/format';
 
-const MONTHS      = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+const FISCAL_MONTHS = ['04','05','06','07','08','09','10','11','12','01','02','03'];
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const YEAR_COLORS = { '2024': P.purple, '2025': P.teal, '2026': P.orange };
 const yColor      = y => YEAR_COLORS[y] || P.blue;
+const getFiscalYear = ym => {
+  const year = Number(ym.slice(0, 4));
+  const month = Number(ym.slice(5));
+  return month >= 4 ? String(year) : String(year - 1);
+};
+const fiscalLabel = y => `FY ${y}-${String(Number(y) + 1).slice(-2)}`;
 
 const round1 = n => Math.round(n * 10) / 10;
 
@@ -12,10 +18,13 @@ export default function YoYTab({ monthly, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
 
   // ── Group by year ────────────────────────────────────────────────────
-  const years = [...new Set(monthly.map(m => m.month.slice(0, 4)))].sort();
+  const years = [...new Set(monthly.map(m => m.fiscalYear || getFiscalYear(m.month)))].sort();
   const byYear = {};
   years.forEach(y => (byYear[y] = {}));
-  monthly.forEach(m => { byYear[m.month.slice(0, 4)][m.month.slice(5)] = m; });
+  monthly.forEach(m => {
+    const fy = m.fiscalYear || getFiscalYear(m.month);
+    byYear[fy][m.month.slice(5)] = m;
+  });
 
   // ── Annual totals ────────────────────────────────────────────────────
   const annuals = years.map(y => {
@@ -53,9 +62,10 @@ export default function YoYTab({ monthly, theme }) {
     const currSum = common.reduce((s, mo) => s + (byYear[currA.year][mo]?.[field] || 0), 0);
     const pct = prevSum > 0 ? round1((currSum - prevSum) / prevSum * 100) : null;
     const N   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    const label = common.length === 12
+    const sortedCommon = common.slice().sort((a, b) => FISCAL_MONTHS.indexOf(a) - FISCAL_MONTHS.indexOf(b));
+    const label = sortedCommon.length === 12
       ? 'full year'
-      : `${N[parseInt(common[0],10)-1]}–${N[parseInt(common[common.length-1],10)-1]} (${common.length}mo)`;
+      : `${N[parseInt(sortedCommon[0],10)-1]}–${N[parseInt(sortedCommon[sortedCommon.length-1],10)-1]} (${sortedCommon.length}mo)`;
     return { pct, label };
   }
 
@@ -105,8 +115,8 @@ export default function YoYTab({ monthly, theme }) {
   // ── Monthly comparison charts ────────────────────────────────────────
   const makeMonthlyDataset = (field, alpha = 'cc') =>
     years.map(y => ({
-      label           : y,
-      data            : MONTHS.map(mo => byYear[y][mo]?.[field] ?? null),
+      label           : fiscalLabel(y),
+      data            : FISCAL_MONTHS.map(mo => byYear[y][mo]?.[field] ?? null),
       backgroundColor : yColor(y) + alpha,
       borderColor     : yColor(y),
       borderWidth     : 1,
@@ -116,8 +126,8 @@ export default function YoYTab({ monthly, theme }) {
 
   const makeLineDataset = field =>
     years.map(y => ({
-      label    : y,
-      data     : MONTHS.map(mo => byYear[y][mo]?.[field] ?? null),
+      label    : fiscalLabel(y),
+      data     : FISCAL_MONTHS.map(mo => byYear[y][mo]?.[field] ?? null),
       borderColor     : yColor(y),
       backgroundColor : 'transparent',
       tension  : 0.4,
@@ -127,7 +137,7 @@ export default function YoYTab({ monthly, theme }) {
 
   // ── Annual bar charts ────────────────────────────────────────────────
   const annualBarData = field => ({
-    labels: years,
+    labels: years.map(fiscalLabel),
     datasets: [{
       label: field === 'total' ? 'Revenue' : field === 'profit' ? 'Profit' : 'Mfg Cost',
       data            : annuals.map(a => a[field]),
@@ -154,7 +164,7 @@ export default function YoYTab({ monthly, theme }) {
           return (
             <div key={a.year} className="card" style={{ borderTop: `3px solid ${yColor(a.year)}` }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                <span style={{ fontWeight: 700, fontSize: '1rem', color: yColor(a.year) }}>{a.year}</span>
+                <span style={{ fontWeight: 700, fontSize: '1rem', color: yColor(a.year) }}>{fiscalLabel(a.year)}</span>
                 {growth != null && (
                   <div style={{ textAlign: 'right' }}>
                     <span className={`kpi-badge ${growth >= 0 ? 'bg' : 'rb'}`}>
@@ -193,7 +203,7 @@ export default function YoYTab({ monthly, theme }) {
           <div className="chart-wrap">
             <Line
               data={{
-                labels: years,
+                labels: years.map(fiscalLabel),
                 datasets: [
                   {
                     label: 'Revenue',
@@ -228,7 +238,7 @@ export default function YoYTab({ monthly, theme }) {
           <div className="chart-wrap">
             <Line
               data={{
-                labels: years,
+                labels: years.map(fiscalLabel),
                 datasets: [
                   {
                     label: 'Margin %',
@@ -264,7 +274,7 @@ export default function YoYTab({ monthly, theme }) {
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Metric</th>
-              {years.map(y => <th key={y} style={{ color: yColor(y) }}>{y}</th>)}
+              {years.map(y => <th key={y} style={{ color: yColor(y) }}>{fiscalLabel(y)}</th>)}
               {years.length >= 2 && <th>YoY Growth</th>}
             </tr>
           </thead>
@@ -308,16 +318,16 @@ export default function YoYTab({ monthly, theme }) {
       <div className="charts-2">
         <div className="card">
           <div className="card-title">Revenue by Month — Year over Year</div>
-          <div className="card-sub">Same calendar months compared across years</div>
+          <div className="card-sub">Same fiscal months compared across years</div>
           <div className="chart-wrap">
-            <Bar data={{ labels: MONTH_NAMES, datasets: makeMonthlyDataset('total') }} options={moneyOpts} />
+            <Bar data={{ labels: FISCAL_MONTHS.map(mo => MONTH_NAMES[parseInt(mo, 10) - 1]), datasets: makeMonthlyDataset('total') }} options={moneyOpts} />
           </div>
         </div>
         <div className="card">
           <div className="card-title">Profit by Month — Year over Year</div>
           <div className="card-sub">Monthly profit compared across years</div>
           <div className="chart-wrap">
-            <Bar data={{ labels: MONTH_NAMES, datasets: makeMonthlyDataset('profit', '99') }} options={moneyOpts} />
+            <Bar data={{ labels: FISCAL_MONTHS.map(mo => MONTH_NAMES[parseInt(mo, 10) - 1]), datasets: makeMonthlyDataset('profit', '99') }} options={moneyOpts} />
           </div>
         </div>
       </div>
@@ -329,14 +339,14 @@ export default function YoYTab({ monthly, theme }) {
           <div className="card-title">Margin % by Month — Year over Year</div>
           <div className="card-sub">Profitability trend across the same months each year</div>
           <div className="chart-wrap">
-            <Line data={{ labels: MONTH_NAMES, datasets: makeLineDataset('margin') }} options={pctOpts} />
+            <Line data={{ labels: FISCAL_MONTHS.map(mo => MONTH_NAMES[parseInt(mo, 10) - 1]), datasets: makeLineDataset('margin') }} options={pctOpts} />
           </div>
         </div>
         <div className="card">
           <div className="card-title">Wastage % by Month — Year over Year</div>
           <div className="card-sub">Wastage as % of revenue — month by month</div>
           <div className="chart-wrap">
-            <Line data={{ labels: MONTH_NAMES, datasets: makeLineDataset('wastage_pct') }} options={pctOpts} />
+            <Line data={{ labels: FISCAL_MONTHS.map(mo => MONTH_NAMES[parseInt(mo, 10) - 1]), datasets: makeLineDataset('wastage_pct') }} options={pctOpts} />
           </div>
         </div>
       </div>
@@ -349,7 +359,7 @@ export default function YoYTab({ monthly, theme }) {
           <div className="card-sub">Total revenue and profit per year</div>
           <div className="chart-wrap">
             <Bar
-              data={{ labels: years, datasets: [
+              data={{ labels: years.map(fiscalLabel), datasets: [
                 { label:'Revenue', data:annuals.map(a=>a.total),  backgroundColor:years.map(y=>yColor(y)+'cc'), borderColor:years.map(yColor), borderWidth:1, borderRadius:6 },
                 { label:'Profit',  data:annuals.map(a=>a.profit), backgroundColor:years.map(y=>yColor(y)+'55'), borderColor:years.map(yColor), borderWidth:1, borderRadius:6 },
               ]}}
@@ -362,7 +372,7 @@ export default function YoYTab({ monthly, theme }) {
           <div className="card-sub">Manufacturing cost and wastage per year</div>
           <div className="chart-wrap">
             <Bar
-              data={{ labels: years, datasets: [
+              data={{ labels: years.map(fiscalLabel), datasets: [
                 { label:'Mfg Cost', data:annuals.map(a=>a.cost),    backgroundColor:years.map(()=>P.red+'cc'),    borderColor:P.red,    borderWidth:1, borderRadius:6 },
                 { label:'Wastage',  data:annuals.map(a=>a.wastage), backgroundColor:years.map(()=>P.yellow+'cc'), borderColor:P.yellow, borderWidth:1, borderRadius:6 },
               ]}}
@@ -379,7 +389,7 @@ export default function YoYTab({ monthly, theme }) {
           <thead>
             <tr>
               <th style={{ textAlign: 'left' }}>Process</th>
-              {years.map(y => <th key={y} style={{ color: yColor(y) }}>{y}</th>)}
+              {years.map(y => <th key={y} style={{ color: yColor(y) }}>{fiscalLabel(y)}</th>)}
               {years.length >= 2 && <th>YoY Growth</th>}
             </tr>
           </thead>

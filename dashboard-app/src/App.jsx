@@ -7,7 +7,11 @@ import ProductionTab  from './components/ProductionTab';
 import YoYTab         from './components/YoYTab';
 
 const AVAILABLE_YEARS = ['2024', '2025', '2026'];
-const CURRENT_YEAR   = String(new Date().getFullYear());
+const getCurrentFiscalYear = () => {
+  const d = new Date();
+  return d.getMonth() >= 3 ? String(d.getFullYear()) : String(d.getFullYear() - 1);
+};
+const CURRENT_YEAR = getCurrentFiscalYear();
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const round1 = n => Math.round(n * 10) / 10;
 
@@ -172,7 +176,7 @@ export default function App() {
           <label>Year</label>
           <select className="filter-select" value={selYear} onChange={e => handleYearChange(e.target.value)}>
             <option value="">All Years</option>
-            {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{y}</option>)}
+            {AVAILABLE_YEARS.map(y => <option key={y} value={y}>{`FY ${y}-${String(Number(y) + 1).slice(-2)}`}</option>)}
           </select>
 
           <label>Month</label>

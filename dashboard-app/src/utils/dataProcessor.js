@@ -1,6 +1,11 @@
 const v = x => (x != null && x !== '') ? parseFloat(x) : 0;
 const round1 = n => Math.round(n * 10) / 10;
 
+export function getFiscalYear(ym) {
+  const [year, month] = ym.split('-').map(Number);
+  return month >= 4 ? String(year) : String(year - 1);
+}
+
 export function processRecords(records) {
   // ── Daily records ────────────────────────────────────────────────────────
   const daily = records.map(r => {
@@ -64,6 +69,7 @@ export function processRecords(records) {
       days: 0,
     };
     const mo = monthMap[m];
+    mo.fiscalYear = getFiscalYear(m);
     mo.total   += d.total_sales; mo.label   += d.label_sales; mo.roll    += d.roll_sales;
     mo.dsales  += d.dsales;      mo.mfgcost += d.mfgcost;     mo.profit  += d.profit;
     mo.inward  += d.inward;      mo.outward += d.outward;     mo.wastage += d.wastage;

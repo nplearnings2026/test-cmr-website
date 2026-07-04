@@ -16,13 +16,22 @@ const CRM_URL  = 'https://crm.artisanventures.in/api/dailysummary';
 const USERCODE = 'e1668ef';
 const USERNM   = '9974544222';
 
+const getFiscalYear = date => {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  return month >= 4 ? String(year) : String(year - 1);
+};
+
+const getFiscalYearStart = fy => `${fy}-04-01`;
+
 app.get('/api/data', async (req, res) => {
   try {
     const { year, refresh } = req.query;
 
     // If refresh requested, update the requested year's file (default: current year)
     if (refresh) {
-      const targetYear = year || String(new Date().getFullYear());
+      const targetYear = year || getFiscalYear(new Date());
       const FILE = join(DATA_DIR, `${targetYear}.json`);
 
       let existing = { data: [] };
@@ -41,7 +50,7 @@ app.get('/api/data', async (req, res) => {
 
       const today = new Date().toISOString().slice(0, 10);
       let fetchFrom;
-      if (!latestDate) fetchFrom = `${targetYear}-01-01`;
+      if (!latestDate) fetchFrom = getFiscalYearStart(targetYear);
       else {
         const next = new Date(latestDate);
         next.setDate(next.getDate() + 1);
