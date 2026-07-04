@@ -231,7 +231,7 @@ export default function App() {
             <MonthlyTab monthly={filtered.monthly} theme={theme} />
           )}
           {activeTab === 'weekly' && (
-            <WeeklyTab daily={filtered.daily} theme={theme} />
+            <WeeklyTab daily={data.daily} theme={theme} />
           )}
           {activeTab === 'production' && (
             <ProductionTab summary={filtered.summary} monthly={filtered.monthly} theme={theme} />
