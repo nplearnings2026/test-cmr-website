@@ -17,7 +17,7 @@ function KpiCard({ label, value, sub, color, badge }) {
   );
 }
 
-export default function OverviewTab({ summary, monthly, theme }) {
+export default function OverviewTab({ summary, monthly, daily, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
   const labels = monthly.map(m => monthLabel(m.month));
 
@@ -157,6 +157,25 @@ export default function OverviewTab({ summary, monthly, theme }) {
       badge:{ text: 'Best margin: ' + bestMargMonth, cls:'bg' } },
   ];
 
+  // ── New: small tiles for daily & production metrics (amount + qty where available)
+  const latestDay = daily && daily.length ? daily[daily.length - 1] : null;
+  const procMetrics = [
+    { key: 'Daily',      amount: latestDay ? latestDay.total_sales : null, details: [{ label: 'Date', value: latestDay ? latestDay.date : null }] },
+    { key: 'Inward',     amount: summary.total_inward,  details: [
+        { label: 'Qty',    value: summary.inward_qty || summary.total_inward_qty || summary.inward_count || null },
+        { label: 'Amount', value: summary.total_inward }
+      ] },
+    { key: 'Outward',    amount: summary.total_outward, details: [
+        { label: 'Qty',    value: summary.outward_qty || summary.total_outward_qty || summary.outward_count || null },
+        { label: 'Amount', value: summary.total_outward }
+      ] },
+    { key: 'Gumming',    amount: summary.total_gumming, details: [{ label: 'Rolls', value: summary.gm_rolls }, { label: 'Qty', value: summary.gm_qty }, { label: 'Amount', value: summary.total_gumming }] },
+    { key: 'Slitting',   amount: summary.total_slitting, details: [{ label: 'Rolls', value: summary.sl_rolls }, { label: 'Qty', value: summary.sl_qty }, { label: 'Amount', value: summary.total_slitting }] },
+    { key: 'Color',      amount: summary.total_color,    details: [{ label: 'Rolls', value: summary.cl_rolls }, { label: 'Qty', value: summary.cl_qty }, { label: 'Wastage', value: summary.cl_waste }, { label: 'Amount', value: summary.total_color }] },
+    { key: 'Die Punch',  amount: summary.total_diepunch, details: [{ label: 'Qty', value: summary.dp_qty }, { label: 'Amount', value: summary.total_diepunch }] },
+    { key: 'Ready Roll', amount: summary.total_readyroll,details: [{ label: 'Rolls', value: summary.rr_rolls }, { label: 'Pieces', value: summary.rr_pcs }, { label: 'Amount', value: summary.total_readyroll }] },
+  ];
+
   // ── Monthly table grand totals ────────────────────────────────────────
   const grandDays  = monthly.reduce((s,m) => s + m.days, 0);
   const grandTotal = summary.total_sales;
@@ -167,6 +186,24 @@ export default function OverviewTab({ summary, monthly, theme }) {
     <div>
       <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(9,minmax(0,1fr))' }}>
         {kpis.map(k => <KpiCard key={k.label} {...k} />)}
+      </div>
+
+      {/* New small tiles: Daily / Inward / Outward / Gumming / Slitting / Color / Die Punch / Ready Roll */}
+      <p className="section">Daily &amp; Production Totals</p>
+      <div className="proc-grid" style={{ display:'grid', gridTemplateColumns:'repeat(8,1fr)', gap:12, marginBottom:16 }}>
+        {procMetrics.map(m => (
+          <div key={m.key} className="proc-tile card" style={{ padding:12 }}>
+            <div style={{ fontSize:12, color:'var(--muted)' }}>{m.key}</div>
+            <div style={{ fontSize:18, fontWeight:600, marginTop:6 }}>{m.amount != null ? fmt(m.amount) : '—'}</div>
+            {m.details && m.details.length > 0 && (
+              <div style={{ marginTop:8, fontSize:12, color:'var(--muted)', display:'grid', gap:4 }}>
+                {m.details.map((d, i) => (
+                  d.value != null && <div key={i}><strong style={{ color:'var(--text)' }}>{d.label}:</strong> <span style={{ marginLeft:6 }}>{typeof d.value === 'number' ? (d.label.toLowerCase().includes('amount') ? fmt(d.value) : d.value) : d.value}</span></div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       <p className="section">Revenue &amp; Profitability</p>
