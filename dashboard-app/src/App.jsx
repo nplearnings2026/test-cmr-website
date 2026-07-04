@@ -129,7 +129,7 @@ export default function App() {
     { id: 'yoy',         label: 'Year over Year' },
   ];
 
-  const isFiltered = selMonth || selYear !== CURRENT_YEAR;
+  const isFiltered = selMonth || selYear !== currentFiscalYear;
 
   return (
     <div className="app">
@@ -189,7 +189,7 @@ export default function App() {
           </select>
 
           {isFiltered && (
-            <button className="filter-reset" onClick={() => { setSelYear(CURRENT_YEAR); setSelMonth(''); }}>Reset</button>
+            <button className="filter-reset" onClick={() => { setSelYear(currentFiscalYear); setSelMonth(''); }}>Reset</button>
           )}
           {filtered && (
             <span className="filter-count">
