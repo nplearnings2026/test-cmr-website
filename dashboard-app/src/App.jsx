@@ -72,7 +72,7 @@ export default function App() {
       ? Array.from(new Set(data.monthly.filter(m => (m.fiscalYear || '').toString() === selYear).map(m => m.month.slice(5))))
       : Array.from(new Set(data.monthly.map(m => m.month.slice(5))));
     return months.sort((a, b) => FISCAL_MONTHS.indexOf(a) - FISCAL_MONTHS.indexOf(b));
-  }, [data]);
+  }, [data, selYear]);
 
   function handleYearChange(y) { setSelYear(y); setSelMonth(''); }
 
