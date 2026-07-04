@@ -66,7 +66,11 @@ export default function App() {
   // ── Filter options ─────────────────────────────────────────────────────
   const monthsForYear = useMemo(() => {
     if (!data) return [];
-    const months = Array.from(new Set(data.monthly.map(m => m.month.slice(5))));
+    // When a specific fiscal year is selected, only include months
+    // that belong to that fiscal year (monthly entries include `fiscalYear`).
+    const months = selYear
+      ? Array.from(new Set(data.monthly.filter(m => (m.fiscalYear || '').toString() === selYear).map(m => m.month.slice(5))))
+      : Array.from(new Set(data.monthly.map(m => m.month.slice(5))));
     return months.sort((a, b) => FISCAL_MONTHS.indexOf(a) - FISCAL_MONTHS.indexOf(b));
   }, [data]);
 
