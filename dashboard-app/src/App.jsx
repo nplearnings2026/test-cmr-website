@@ -14,6 +14,7 @@ const getCurrentFiscalYear = () => {
 const currentFiscalYear = getCurrentFiscalYear();
 const fiscalLabel = y => `FY ${y}-${String(Number(y) + 1).slice(-2)}`;
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const FISCAL_MONTHS = ['04','05','06','07','08','09','10','11','12','01','02','03'];
 const round1 = n => Math.round(n * 10) / 10;
 
 export default function App() {
@@ -63,10 +64,11 @@ export default function App() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // ── Filter options ─────────────────────────────────────────────────────
-  const monthsForYear = useMemo(
-    () => data ? data.monthly.map(m => m.month.slice(5)) : [],
-    [data],
-  );
+  const monthsForYear = useMemo(() => {
+    if (!data) return [];
+    const months = Array.from(new Set(data.monthly.map(m => m.month.slice(5))));
+    return months.sort((a, b) => FISCAL_MONTHS.indexOf(a) - FISCAL_MONTHS.indexOf(b));
+  }, [data]);
 
   function handleYearChange(y) { setSelYear(y); setSelMonth(''); }
 
