@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { processRecords } from './utils/dataProcessor';
 import OverviewTab    from './components/OverviewTab';
+import DailyTab       from './components/DailyTab';
 import MonthlyTab     from './components/MonthlyTab';
 import WeeklyTab      from './components/WeeklyTab';
 import ProductionTab  from './components/ProductionTab';
@@ -129,10 +130,11 @@ export default function App() {
 
   const TABS = [
     { id: 'overview',    label: 'Overview' },
-    { id: 'monthly',     label: 'Monthly Metrics' },
-    { id: 'weekly',      label: 'Weekly Comparison' },
-    { id: 'production',  label: 'Production' },
+    { id: 'daily',       label: 'Daily' },
+    { id: 'weekly',      label: 'Weekly' },
+    { id: 'monthly',     label: 'Monthly' },
     { id: 'yoy',         label: 'Year over Year' },
+    { id: 'production',  label: 'Production' },
   ];
 
   const isFiltered = selMonth || selYear !== currentFiscalYear;
@@ -177,8 +179,8 @@ export default function App() {
         ))}
       </div>
 
-      {/* ── Global filter bar (hidden on YoY tab) ── */}
-      {data && activeTab !== 'yoy' && (
+      {/* ── Global filter bar (hidden on Daily, Weekly, and YoY tabs) ── */}
+      {data && !['daily','weekly','yoy'].includes(activeTab) && (
         <div className="filter-bar">
           <label>Year</label>
           <select className="filter-select" value={selYear} onChange={e => handleYearChange(e.target.value)}>
@@ -227,11 +229,20 @@ export default function App() {
           {activeTab === 'overview' && (
             <OverviewTab summary={filtered.summary} monthly={filtered.monthly} theme={theme} />
           )}
+          {activeTab === 'daily' && (
+            <DailyTab
+              summary={filtered.summary}
+              monthly={filtered.monthly}
+              daily={filtered.daily}
+              rawDaily={fullData?.daily || data.daily}
+              theme={theme}
+            />
+          )}
           {activeTab === 'monthly' && (
             <MonthlyTab monthly={filtered.monthly} theme={theme} />
           )}
           {activeTab === 'weekly' && (
-            <WeeklyTab daily={data.daily} theme={theme} />
+            <WeeklyTab daily={fullData?.daily || data.daily} theme={theme} />
           )}
           {activeTab === 'production' && (
             <ProductionTab summary={filtered.summary} monthly={filtered.monthly} theme={theme} />

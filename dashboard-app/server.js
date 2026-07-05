@@ -106,8 +106,11 @@ app.get('/api/data', async (req, res) => {
       return res.json({ success: 1, data: merged, message: `Fetched ${newData.length} new rows` });
     }
 
-    // Default: return one or more year files concatenated (same as before)
-    const yearsToLoad = year ? [year] : AVAILABLE_YEARS || ['2024','2025','2026'];
+    // Default: return one or more year files concatenated.
+    // If a fiscal year is requested (year=YYYY), include that calendar year
+    // and the next calendar year so Apr->Mar months are available, then
+    // filter records to the requested fiscal year using `getFiscalYear()`.
+    const yearsToLoad = year ? [year, String(Number(year) + 1)] : (AVAILABLE_YEARS || ['2024','2025','2026']);
     let allData = [];
     for (const y of yearsToLoad) {
       const file = join(DATA_DIR, `${y}.json`);
@@ -122,7 +125,12 @@ app.get('/api/data', async (req, res) => {
         console.warn(`[API] File not found: ${y}.json`);
       }
     }
-    console.log(`[API] Loaded ${allData.length} records for: ${yearsToLoad.join(', ')}`);
+
+    if (year) {
+      allData = allData.filter(d => d && d.date && getFiscalYear(d.date) === year);
+    }
+
+    console.log(`[API] Loaded ${allData.length} records for: ${year ? `FY ${year}` : yearsToLoad.join(', ')}`);
     res.json({ success: 1, data: allData });
   } catch (err) {
     console.error('[API] Error:', err.message);

@@ -23,13 +23,25 @@ export function processRecords(records) {
 
     const inward  = v(r.inwardamount);
     const outward = v(r.outwardamount);
+    const inward_qty  = v(r.inwardqty ?? r.inward_qty ?? r.inwardQty);
+    const outward_qty = v(r.outwardqty ?? r.outward_qty ?? r.outwardQty);
     const wastage = Math.max(0, v(r.colorwastage)) + Math.max(0, v(r.readyrollwastage));
 
     return {
       date: r.date,
-      total_sales, label_sales, roll_sales, dsales,
+      total_sales, label_sales, sheet_sales, roll_sales, dsales,
+      // per-component qty and mfg costs (if present in source)
+      label_qty: v(r.sls_labelqty ?? r.sls_label_qty ?? r.sls_labelQty),
+      roll_qty:  v(r.sls_rollqty ?? r.sls_roll_qty ?? r.sls_rollQty),
+      sheet_qty: v(r.sls_sheetqty ?? r.sls_sheet_qty ?? r.sls_sheetQty),
+      dsales_qty: v(r.sls_dsalesqty ?? r.sls_dsales_qty ?? r.sls_dsalesQty),
+      label_mfgcost: v(r.sls_labelmfgcost),
+      roll_mfgcost:  v(r.sls_rollmfgcost),
+      sheet_mfgcost: v(r.sls_sheetmfgcost),
+      dsales_mfgcost: v(r.sls_dsalesmfgcost),
       profit, mfgcost, margin,
       inward, outward, wastage,
+      inward_qty, outward_qty,
       // production process amounts (for overview charts)
       gumming  : v(r.gummingamount),
       slitting : v(r.slittingamount),
@@ -60,6 +72,7 @@ export function processRecords(records) {
     if (!monthMap[m]) monthMap[m] = {
       month: m, total: 0, label: 0, roll: 0, dsales: 0,
       mfgcost: 0, profit: 0, inward: 0, outward: 0, wastage: 0,
+      inward_qty: 0, outward_qty: 0,
       gumming: 0, slitting: 0, color: 0, diepunch: 0, readyroll: 0,
       gm_rolls:0, gm_qty:0,
       sl_rolls:0, sl_qty:0,
@@ -73,6 +86,7 @@ export function processRecords(records) {
     mo.total   += d.total_sales; mo.label   += d.label_sales; mo.roll    += d.roll_sales;
     mo.dsales  += d.dsales;      mo.mfgcost += d.mfgcost;     mo.profit  += d.profit;
     mo.inward  += d.inward;      mo.outward += d.outward;     mo.wastage += d.wastage;
+    mo.inward_qty  += d.inward_qty || 0; mo.outward_qty += d.outward_qty || 0;
     mo.gumming += d.gumming; mo.slitting += d.slitting; mo.color += d.color;
     mo.diepunch+= d.diepunch; mo.readyroll+= d.readyroll;
     mo.gm_rolls += d.gm_rolls; mo.gm_qty   += d.gm_qty;
@@ -120,6 +134,8 @@ export function processRecords(records) {
     total_dsales      : tot('dsales'),
     total_inward      : tot('inward'),
     total_outward     : tot('outward'),
+    total_inward_qty  : tot('inward_qty'),
+    total_outward_qty : tot('outward_qty'),
     total_wastage     : tot('wastage'),
     total_gumming     : tot('gumming'),
     total_slitting    : tot('slitting'),

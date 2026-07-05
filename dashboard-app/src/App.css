@@ -180,6 +180,9 @@ h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
 .kpi-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .67rem; font-weight: 600; margin-top: 6px; }
 .bg        { background: rgba(34,197,94,.15);  color: var(--green); }
 .rb        { background: rgba(239,68,68,.15);  color: var(--red);   }
+/* Light sales tile backgrounds */
+.sales-green { background: rgba(34,197,94,0.06); }
+.sales-yellow { background: rgba(245,158,11,0.06); }
 
 /* ── Cards / Charts ──────────────────────────────────────────────────── */
 .charts-2 { display: grid; grid-template-columns: 1fr 1fr;  gap: 16px; margin-bottom: 16px; }
@@ -315,8 +318,8 @@ tbody tr:hover td { background: rgba(108,99,255,.05); }
   flex-direction: column;
   gap: 4px;
 }
-.week-badge-curr  { border-left: 3px solid #6c63ff; }
-.week-badge-prev  { border-left: 3px solid #8892a4; }
+.week-badge-curr  { border-left: 3px solid #22c55e; }
+.week-badge-prev  { border-left: 3px solid #f59e0b; }
 .week-badge-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .week-badge-dates { font-size: .95rem; font-weight: 600; }
 
