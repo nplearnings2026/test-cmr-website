@@ -97,7 +97,24 @@ export default function DailyTab({ summary, daily, rawDaily }) {
                     })()}
                   </div>
                   <div className="kpi-sub">
-                    <div>Qty: {s.qty != null ? s.qty : '—'}</div>
+                    {/* Added Trend Indicator Here */}
+                    <div>
+                        Qty: {s.qty != null ? s.qty : '—'}
+                        {(s.k === 'Label Sales' || s.k === 'Rolls Sales' || s.k === 'Direct Sales') && (() => {
+                            const prevQty = yesterdayDay ? (s.k === 'Label Sales' ? yesterdayDay.label_qty : s.k === 'Direct Sales' ? yesterdayDay.dsales_qty : yesterdayDay.roll_qty) : null;
+                            if (prevQty == null || s.qty == null) return <span style={{ marginLeft: 6 }}>—</span>;
+
+                            let indicator = '';
+                            if (s.qty > prevQty) {
+                                indicator = <span style={{ color:'var(--success)', marginRight: 4}}>▲</span>; // Using 'success' class for visual consistency, though general style is used above
+                            } else if (s.qty < prevQty) {
+                                indicator = <span style={{ color:'var(--danger)', marginRight: 4}}>▼</span>;
+                            } else {
+                                indicator = <span style={{ color:'var(--secondary)', marginLeft: 6 }}>→</span>;
+                            }
+                            return indicator;
+                        })()}
+                    </div>
                     <div>Mfg: {s.mfg != null ? fmt(s.mfg) : '—'}</div>
                   </div>
                 </div>
