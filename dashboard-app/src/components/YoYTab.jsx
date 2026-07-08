@@ -13,6 +13,31 @@ const getFiscalYear = ym => {
 const fiscalLabel = y => `FY ${y}-${String(Number(y) + 1).slice(-2)}`;
 
 const round1 = n => Math.round(n * 10) / 10;
+const pct = (n, d) => d > 0 ? (n / d * 100).toFixed(1) + '%' : '—';
+// invert = true for metrics where a decrease is the improvement (cost, wastage)
+const deltaFor = (curr, prev, invert = false) => {
+  if (prev == null || prev === 0) return null;
+  const p = (curr - prev) / prev * 100;
+  return { pct: p, positive: invert ? p <= 0 : p >= 0 };
+};
+// KPI top accent bar reflects the metric's trend: green if improving, red if
+// worsening, neutral gray when there's no prior period to compare against.
+const colorForDelta = delta => !delta ? '#8892a4' : delta.positive ? P.green : P.red;
+
+function ExecKpiCard({ label, value, sub, color, delta }) {
+  return (
+    <div className="kpi" style={{ '--kc': color }}>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
+      {delta && (
+        <span className={`kpi-badge ${delta.positive ? 'bg' : 'rb'}`}>
+          {delta.pct > 0 ? '▲' : delta.pct < 0 ? '▼' : '→'} {Math.abs(delta.pct).toFixed(1)}% vs prior year
+        </span>
+      )}
+    </div>
+  );
+}
 
 export default function YoYTab({ monthly, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
@@ -39,6 +64,9 @@ export default function YoYTab({ monthly, theme }) {
       total, profit, cost,
       margin   : total > 0 ? round1(profit / total * 100) : 0,
       cost_pct : total > 0 ? round1(cost   / total * 100) : 0,
+      label    : sum('label'),
+      roll     : sum('roll'),
+      dsales   : sum('dsales'),
       inward   : sum('inward'),
       outward  : sum('outward'),
       wastage  : sum('wastage'),
@@ -48,10 +76,36 @@ export default function YoYTab({ monthly, theme }) {
       color    : sum('color'),
       diepunch : sum('diepunch'),
       readyroll: sum('readyroll'),
+      cl_waste : sum('cl_waste'),
+      rr_waste : sum('rr_waste'),
       months   : ms.length,
       moKeys,
     };
   });
+
+  const latestAnnual = annuals[annuals.length - 1];
+  const priorAnnual  = annuals.length > 1 ? annuals[annuals.length - 2] : null;
+  const revDelta    = latestAnnual ? deltaFor(latestAnnual.total, priorAnnual?.total) : null;
+  const profitDelta = latestAnnual ? deltaFor(latestAnnual.profit, priorAnnual?.profit) : null;
+  const costDelta   = latestAnnual ? deltaFor(latestAnnual.cost, priorAnnual?.cost, true) : null;
+  const wastageDelta= latestAnnual ? deltaFor(latestAnnual.wastage, priorAnnual?.wastage, true) : null;
+  const colorWasteDelta = latestAnnual ? deltaFor(latestAnnual.cl_waste, priorAnnual?.cl_waste, true) : null;
+  const rrWasteDelta    = latestAnnual ? deltaFor(latestAnnual.rr_waste, priorAnnual?.rr_waste, true) : null;
+
+  const execKpis = latestAnnual ? [
+    { label: 'Total Revenue', value: fmt(latestAnnual.total), sub: fiscalLabel(latestAnnual.year), color: colorForDelta(revDelta),
+      delta: revDelta },
+    { label: 'Total Profit',  value: fmt(latestAnnual.profit), sub: `${latestAnnual.margin}% margin`, color: colorForDelta(profitDelta),
+      delta: profitDelta },
+    { label: 'Mfg Cost',      value: fmt(latestAnnual.cost), sub: `${latestAnnual.cost_pct}% of revenue`, color: colorForDelta(costDelta),
+      delta: costDelta },
+    { label: 'Total Wastage', value: fmt(latestAnnual.wastage), sub: `${latestAnnual.wastage_pct}% of revenue`, color: colorForDelta(wastageDelta),
+      delta: wastageDelta },
+    { label: 'Color Waste',      value: fmt(latestAnnual.cl_waste), sub: pct(latestAnnual.cl_waste, latestAnnual.wastage) + ' of wastage', color: colorForDelta(colorWasteDelta),
+      delta: colorWasteDelta },
+    { label: 'Ready Roll Waste', value: fmt(latestAnnual.rr_waste), sub: pct(latestAnnual.rr_waste, latestAnnual.wastage) + ' of wastage', color: colorForDelta(rrWasteDelta),
+      delta: rrWasteDelta },
+  ] : [];
 
   // ── Comparable-period growth between two consecutive years ───────────
   // Sums only the months present in BOTH years for a fair comparison.
@@ -155,6 +209,15 @@ export default function YoYTab({ monthly, theme }) {
 
   return (
     <div>
+      {execKpis.length > 0 && (
+        <>
+          <p className="section">Executive Summary</p>
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6,minmax(0,1fr))' }}>
+            {execKpis.map(k => <ExecKpiCard key={k.label} {...k} />)}
+          </div>
+        </>
+      )}
+
       {/* ── Annual summary cards ────────────────────────────────────── */}
       <p className="section">Annual Summary</p>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${years.length}, 1fr)`, gap: 14, marginBottom: 24 }}>

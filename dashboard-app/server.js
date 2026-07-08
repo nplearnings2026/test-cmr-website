@@ -16,10 +16,14 @@ const CRM_URL  = 'https://crm.artisanventures.in/api/dailysummary';
 const USERCODE = 'e1668ef';
 const USERNM   = '9974544222';
 
+// Parses the "YYYY-MM-DD" string directly instead of going through Date() —
+// `new Date('2025-04-01')` is parsed as UTC midnight, which shifts to the
+// previous day in timezones behind UTC (e.g. US timezones), misclassifying
+// April 1st into the prior fiscal year.
 const getFiscalYear = date => {
-  const d = typeof date === 'string' ? new Date(date) : date;
-  const year = d.getFullYear();
-  const month = d.getMonth() + 1;
+  const s = typeof date === 'string' ? date : date.toISOString().slice(0, 10);
+  const year  = Number(s.slice(0, 4));
+  const month = Number(s.slice(5, 7));
   return month >= 4 ? String(year) : String(year - 1);
 };
 

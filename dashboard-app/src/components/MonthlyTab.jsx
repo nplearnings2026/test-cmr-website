@@ -3,6 +3,38 @@ import { fmt, monthLabel, P, MONTH_COLORS, getChartTheme } from '../utils/format
 
 const yL   = v => '₹' + (v / 100_000).toFixed(1) + 'L';
 const yPct = v => v + '%';
+const shiftMonth = (ym, delta) => {
+  const [y, m] = ym.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+};
+const roundQty = v => v == null ? v : Math.round(v);
+const pct = (n, d) => d > 0 ? (n / d * 100).toFixed(1) + '%' : '—';
+
+// invert = true for metrics where a decrease is the improvement (cost, wastage)
+const deltaFor = (curr, prev, invert = false) => {
+  if (prev == null || prev === 0) return null;
+  const p = (curr - prev) / prev * 100;
+  return { pct: p, positive: invert ? p <= 0 : p >= 0 };
+};
+// KPI top accent bar reflects the metric's trend: green if improving, red if
+// worsening, neutral gray when there's no prior period to compare against.
+const colorForDelta = delta => !delta ? '#8892a4' : delta.positive ? P.green : P.red;
+
+function ExecKpiCard({ label, value, sub, color, delta }) {
+  return (
+    <div className="kpi" style={{ '--kc': color }}>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
+      {delta && (
+        <span className={`kpi-badge ${delta.positive ? 'bg' : 'rb'}`}>
+          {delta.pct > 0 ? '▲' : delta.pct < 0 ? '▼' : '→'} {Math.abs(delta.pct).toFixed(1)}% vs prior month
+        </span>
+      )}
+    </div>
+  );
+}
 
 function MetricTile({ color, title, children }) {
   return (
@@ -13,7 +45,7 @@ function MetricTile({ color, title, children }) {
   );
 }
 
-export default function MonthlyTab({ monthly, theme }) {
+export default function MonthlyTab({ monthly, fullMonthly, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
   const labels = monthly.map(m => monthLabel(m.month));
 
@@ -99,8 +131,163 @@ export default function MonthlyTab({ monthly, theme }) {
   const maxOf  = f => Math.max(...monthly.map(m => m[f]), 1);
   const pct100 = (v, mx) => Math.min(100, Math.round(v / mx * 100));
 
+  // ── Executive summary — latest month in scope vs the one before it ────
+  const latestMonth = monthly.length ? monthly[monthly.length - 1] : null;
+  // Look up the true prior calendar month from the full (unfiltered) dataset,
+  // since `monthly` may be scoped down to a single selected month.
+  const prevMonthKey = latestMonth ? shiftMonth(latestMonth.month, -1) : null;
+  const prevMonth = prevMonthKey ? (fullMonthly || monthly).find(m => m.month === prevMonthKey) : null;
+  const revDelta    = latestMonth ? deltaFor(latestMonth.total, prevMonth?.total) : null;
+  const profitDelta = latestMonth ? deltaFor(latestMonth.profit, prevMonth?.profit) : null;
+  const costDelta   = latestMonth ? deltaFor(latestMonth.mfgcost, prevMonth?.mfgcost, true) : null;
+  const wastageDelta= latestMonth ? deltaFor(latestMonth.wastage, prevMonth?.wastage, true) : null;
+  const colorWasteDelta = latestMonth ? deltaFor(latestMonth.cl_waste, prevMonth?.cl_waste, true) : null;
+  const rrWasteDelta    = latestMonth ? deltaFor(latestMonth.rr_waste, prevMonth?.rr_waste, true) : null;
+
+  const execKpis = latestMonth ? [
+    { label: 'Total Revenue', value: fmt(latestMonth.total),   sub: monthLabel(latestMonth.month), color: colorForDelta(revDelta),
+      delta: revDelta },
+    { label: 'Total Profit',  value: fmt(latestMonth.profit),  sub: `${latestMonth.margin}% margin`, color: colorForDelta(profitDelta),
+      delta: profitDelta },
+    { label: 'Mfg Cost',      value: fmt(latestMonth.mfgcost), sub: `${latestMonth.cost_pct}% of revenue`, color: colorForDelta(costDelta),
+      delta: costDelta },
+    { label: 'Total Wastage', value: fmt(latestMonth.wastage), sub: `${latestMonth.wastage_pct}% of revenue`, color: colorForDelta(wastageDelta),
+      delta: wastageDelta },
+    { label: 'Color Waste',      value: fmt(latestMonth.cl_waste), sub: pct(latestMonth.cl_waste, latestMonth.wastage) + ' of wastage', color: colorForDelta(colorWasteDelta),
+      delta: colorWasteDelta },
+    { label: 'Ready Roll Waste', value: fmt(latestMonth.rr_waste), sub: pct(latestMonth.rr_waste, latestMonth.wastage) + ' of wastage', color: colorForDelta(rrWasteDelta),
+      delta: rrWasteDelta },
+  ] : [];
+
+  // Sales breakdown — Label/Direct/Rolls Sales, This Month vs Prior Month
+  // (mirrors DailyTab/WeeklyTab's Today-Yesterday / Current-Prev Week tiles)
+  const thisMonthSalesBreak = latestMonth ? [
+    { k: 'Label Sales',  amount: latestMonth.label,  qty: latestMonth.label_qty,  mfg: latestMonth.label_mfgcost },
+    { k: 'Direct Sales', amount: latestMonth.dsales, qty: latestMonth.dsales_qty, mfg: latestMonth.dsales_mfgcost },
+    { k: 'Rolls Sales',  amount: latestMonth.roll,   qty: latestMonth.roll_qty,   mfg: latestMonth.roll_mfgcost },
+  ] : [];
+
+  const priorMonthSalesBreak = prevMonth ? [
+    { k: 'Label Sales',  amount: prevMonth.label,  qty: prevMonth.label_qty,  mfg: prevMonth.label_mfgcost },
+    { k: 'Direct Sales', amount: prevMonth.dsales, qty: prevMonth.dsales_qty, mfg: prevMonth.dsales_mfgcost },
+    { k: 'Rolls Sales',  amount: prevMonth.roll,   qty: prevMonth.roll_qty,   mfg: prevMonth.roll_mfgcost },
+  ] : [];
+
+  // Production & logistics — one tile per category, This Month vs Prior Month
+  // (mirrors DailyTab/WeeklyTab's wkpi-grid tiles)
+  const monthlyProcKpis = latestMonth ? [
+    { label: 'Material Inward',  color: '#8892a4', c: latestMonth.inward    || 0, p: prevMonth?.inward    || 0, qtyC: latestMonth.inward_qty  ?? null, qtyP: prevMonth?.inward_qty  ?? null },
+    { label: 'Material Outward', color: '#8892a4', c: latestMonth.outward   || 0, p: prevMonth?.outward   || 0, qtyC: latestMonth.outward_qty ?? null, qtyP: prevMonth?.outward_qty ?? null },
+    { label: 'Gumming',          color: '#8892a4', c: latestMonth.gumming   || 0, p: prevMonth?.gumming   || 0, qtyC: latestMonth.gm_qty      ?? null, qtyP: prevMonth?.gm_qty      ?? null },
+    { label: 'Slitting',         color: '#8892a4', c: latestMonth.slitting  || 0, p: prevMonth?.slitting  || 0, qtyC: latestMonth.sl_qty      ?? null, qtyP: prevMonth?.sl_qty      ?? null },
+    { label: 'Color',            color: '#8892a4', c: latestMonth.color     || 0, p: prevMonth?.color     || 0, qtyC: latestMonth.cl_qty      ?? null, qtyP: prevMonth?.cl_qty      ?? null },
+    { label: 'Die Punch',        color: '#8892a4', c: latestMonth.diepunch  || 0, p: prevMonth?.diepunch  || 0, qtyC: latestMonth.dp_qty      ?? null, qtyP: prevMonth?.dp_qty      ?? null },
+    { label: 'Ready Roll',       color: '#8892a4', c: latestMonth.readyroll || 0, p: prevMonth?.readyroll || 0, qtyC: latestMonth.rr_pcs      ?? null, qtyP: prevMonth?.rr_pcs      ?? null },
+    { label: 'Wastage',          color: P.yellow,  c: latestMonth.wastage   || 0, p: prevMonth?.wastage   || 0 },
+  ] : [];
+
+  function procBadge(c, p) {
+    if (!p) return null;
+    const change = (c - p) / p * 100;
+    const cls = change > 0 ? 'wc-up' : change < 0 ? 'wc-dn' : 'wc-flat';
+    return <span className={`wkpi-change ${cls}`}>{change > 0 ? '+' : ''}{change.toFixed(1)}% vs prior month</span>;
+  }
+
   return (
     <div>
+      {execKpis.length > 0 && (
+        <>
+          <p className="section">Executive Summary</p>
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6,minmax(0,1fr))' }}>
+            {execKpis.map(k => <ExecKpiCard key={k.label} {...k} />)}
+          </div>
+        </>
+      )}
+
+      {thisMonthSalesBreak.length > 0 && (
+        <>
+          <p className="section">Sales Breakdown — This Month vs Prior Month</p>
+          <div className="charts-2">
+            <div>
+              <div className="kpi-grid" style={{ gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:10, marginBottom:16 }}>
+                {thisMonthSalesBreak.map(s => (
+                  <div key={s.k} className="kpi sales-today" style={{ '--kc':P.blue }}>
+                    <div className="kpi-label">{s.k}</div>
+                    <div className="kpi-value">{s.amount != null ? fmt(s.amount) : '—'}</div>
+                    <div className="kpi-sub">
+                      <div>Qty: {s.qty != null ? roundQty(s.qty) : '—'}</div>
+                      <div>Mfg: {s.mfg != null ? fmt(s.mfg) : '—'}</div>
+                    </div>
+                    {(() => {
+                      const prev = priorMonthSalesBreak.find(x => x.k === s.k)?.amount;
+                      if (prev == null) return null;
+                      if (prev === 0 && s.amount > 0) return <span className="kpi-badge bg">New</span>;
+                      const d = deltaFor(s.amount, prev);
+                      if (!d) return null;
+                      return (
+                        <span className={`kpi-badge ${d.positive ? 'bg' : 'rb'}`}>
+                          {d.pct > 0 ? '▲' : d.pct < 0 ? '▼' : '→'} {Math.abs(d.pct).toFixed(1)}% vs prior month
+                        </span>
+                      );
+                    })()}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="kpi-grid" style={{ gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:10, marginBottom:16 }}>
+                {priorMonthSalesBreak.map(s => (
+                  <div key={s.k} className="kpi sales-yesterday" style={{ '--kc':P.yellow }}>
+                    <div className="kpi-label">{s.k}</div>
+                    <div className="kpi-value">{s.amount != null ? fmt(s.amount) : '—'}</div>
+                    <div className="kpi-sub">
+                      <div>Qty: {s.qty != null ? roundQty(s.qty) : '—'}</div>
+                      <div>Mfg: {s.mfg != null ? fmt(s.mfg) : '—'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {monthlyProcKpis.length > 0 && (
+        <>
+          <p className="section">Production &amp; Logistics — This Month vs Prior Month</p>
+          <div className="wkpi-grid">
+            {monthlyProcKpis.map(k => (
+              <div key={k.label} className="wkpi" style={{ '--wc': k.color }}>
+                <div className="wkpi-label">{k.label}</div>
+                <div className="wkpi-row">
+                  <div>
+                    <div className="wkpi-col-label">This Month</div>
+                    <div className="wkpi-col-val">{fmt(k.c)}</div>
+                  </div>
+                  <div>
+                    <div className="wkpi-col-label">Prior Month</div>
+                    <div className="wkpi-col-val" style={{ color: 'var(--muted)' }}>{fmt(k.p)}</div>
+                  </div>
+                </div>
+                {k.qtyC != null && k.qtyP != null && (
+                  <div className="wkpi-row">
+                    <div>
+                      <div className="wkpi-col-label">Qty</div>
+                      <div className="wkpi-col-val">{roundQty(k.qtyC)}</div>
+                    </div>
+                    <div>
+                      <div className="wkpi-col-label">Qty</div>
+                      <div className="wkpi-col-val" style={{ color: 'var(--muted)' }}>{roundQty(k.qtyP)}</div>
+                    </div>
+                  </div>
+                )}
+                {procBadge(k.c, k.p)}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
       {/* Metric tiles */}
       <p className="section">Month-wise Snapshot</p>
       <div className="tile-grid">

@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { processRecords } from './utils/dataProcessor';
+import { processRecords, summarizeMonthly } from './utils/dataProcessor';
 import OverviewTab    from './components/OverviewTab';
 import DailyTab       from './components/DailyTab';
 import MonthlyTab     from './components/MonthlyTab';
 import WeeklyTab      from './components/WeeklyTab';
 import ProductionTab  from './components/ProductionTab';
 import YoYTab         from './components/YoYTab';
+import ReportTab      from './components/ReportTab';
 
 const AVAILABLE_YEARS = ['2024', '2025', '2026'];
 const getCurrentFiscalYear = () => {
@@ -16,7 +17,8 @@ const currentFiscalYear = getCurrentFiscalYear();
 const fiscalLabel = y => `FY ${y}-${String(Number(y) + 1).slice(-2)}`;
 const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const FISCAL_MONTHS = ['04','05','06','07','08','09','10','11','12','01','02','03'];
-const round1 = n => Math.round(n * 10) / 10;
+// Temporarily hidden — flip back to true to re-enable the Report tab's custom From/To date filter.
+const SHOW_REPORT_DATE_FILTER = false;
 
 export default function App() {
   const [activeTab, setActiveTab]   = useState('overview');
@@ -28,6 +30,8 @@ export default function App() {
   const [selMonth,  setSelMonth]    = useState('');
   const [theme,     setTheme]       = useState(() => localStorage.getItem('dash-theme') || 'dark');
   const [fullData,  setFullData]    = useState(null);
+  const [reportFrom, setReportFrom] = useState('');
+  const [reportTo,   setReportTo]   = useState('');
 
   useEffect(() => {
     document.body.classList.toggle('light', theme === 'light');
@@ -87,36 +91,9 @@ export default function App() {
     if (selMonth) { monthly = monthly.filter(m => m.month.slice(5) === selMonth);  daily = daily.filter(d => d.date.slice(5, 7) === selMonth); }
 
     // Recompute summary totals from filtered monthly
-    const sum = f => monthly.reduce((s, m) => s + (m[f] || 0), 0);
-    const totalSales  = sum('total');
-    const totalProfit = sum('profit');
-    const best        = monthly.reduce((b, m) => m.total  > (b?.total  || 0) ? m : b, null);
-    const bestMargin  = monthly.reduce((b, m) => m.margin > (b?.margin || 0) ? m : b, null);
-
     const summary = {
       ...data.summary,
-      total_sales    : totalSales,
-      total_profit   : totalProfit,
-      total_mfgcost  : sum('mfgcost'),
-      overall_margin : totalSales > 0 ? round1(totalProfit / totalSales * 100) : 0,
-      total_label    : sum('label'),
-      total_roll     : sum('roll'),
-      total_dsales   : sum('dsales'),
-      total_inward   : sum('inward'),
-      total_outward  : sum('outward'),
-      total_wastage  : sum('wastage'),
-      total_gumming  : sum('gumming'),
-      total_slitting : sum('slitting'),
-      total_color    : sum('color'),
-      total_diepunch : sum('diepunch'),
-      total_readyroll: sum('readyroll'),
-      gm_rolls: sum('gm_rolls'), gm_qty  : sum('gm_qty'),
-      sl_rolls: sum('sl_rolls'), sl_qty  : sum('sl_qty'),
-      cl_rolls: sum('cl_rolls'), cl_qty  : sum('cl_qty'), cl_waste: sum('cl_waste'),
-      dp_qty  : sum('dp_qty'),
-      rr_rolls: sum('rr_rolls'), rr_pcs  : sum('rr_pcs'), rr_waste: sum('rr_waste'),
-      best_month        : best?.month        || '',
-      best_margin_month : bestMargin?.month  || '',
+      ...summarizeMonthly(monthly),
       date_range: {
         from  : daily[0]?.date || data.summary.date_range.from,
         to    : daily[daily.length - 1]?.date || data.summary.date_range.to,
@@ -135,6 +112,7 @@ export default function App() {
     { id: 'monthly',     label: 'Monthly' },
     { id: 'yoy',         label: 'Year over Year' },
     { id: 'production',  label: 'Production' },
+    { id: 'report',      label: 'Report' },
   ];
 
   const isFiltered = selMonth || selYear !== currentFiscalYear;
@@ -196,6 +174,18 @@ export default function App() {
             ))}
           </select>
 
+          {SHOW_REPORT_DATE_FILTER && activeTab === 'report' && (
+            <>
+              <label>From</label>
+              <input type="date" className="filter-date" value={reportFrom} onChange={e => setReportFrom(e.target.value)} />
+              <label>To</label>
+              <input type="date" className="filter-date" value={reportTo} onChange={e => setReportTo(e.target.value)} />
+              {(reportFrom || reportTo) && (
+                <button className="filter-reset" onClick={() => { setReportFrom(''); setReportTo(''); }}>Clear Dates</button>
+              )}
+            </>
+          )}
+
           {isFiltered && (
             <button className="filter-reset" onClick={() => { setSelYear(currentFiscalYear); setSelMonth(''); }}>Reset</button>
           )}
@@ -239,13 +229,28 @@ export default function App() {
             />
           )}
           {activeTab === 'monthly' && (
-            <MonthlyTab monthly={filtered.monthly} theme={theme} />
+            <MonthlyTab monthly={filtered.monthly} fullMonthly={fullData?.monthly || data.monthly} theme={theme} />
           )}
           {activeTab === 'weekly' && (
             <WeeklyTab daily={fullData?.daily || data.daily} theme={theme} />
           )}
           {activeTab === 'production' && (
             <ProductionTab summary={filtered.summary} monthly={filtered.monthly} theme={theme} />
+          )}
+          {activeTab === 'report' && fullData && (
+            <ReportTab
+              fullMonthly={fullData.monthly}
+              fullDaily={fullData.daily}
+              currentFiscalYear={currentFiscalYear}
+              selYear={selYear}
+              selMonth={selMonth}
+              dateFrom={reportFrom}
+              dateTo={reportTo}
+              theme={theme}
+            />
+          )}
+          {activeTab === 'report' && !fullData && (
+            <div className="loading-overlay"><div className="spinner" /><p>Loading all years…</p></div>
           )}
           {activeTab === 'yoy' && fullData && (
             <YoYTab monthly={fullData.monthly} theme={theme} />

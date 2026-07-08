@@ -11,6 +11,33 @@ function fmtRange(mon) {
   return mon.toLocaleDateString('en-IN',o) + ' – ' + sun.toLocaleDateString('en-IN',o);
 }
 
+const pct = (n, d) => d > 0 ? (n / d * 100).toFixed(1) + '%' : '—';
+const roundQty = v => v == null ? v : Math.round(v);
+// invert = true for metrics where a decrease is the improvement (cost, wastage)
+const deltaFor = (curr, prev, invert = false) => {
+  if (prev == null || prev === 0) return null;
+  const p = (curr - prev) / prev * 100;
+  return { pct: p, positive: invert ? p <= 0 : p >= 0 };
+};
+// KPI top accent bar reflects the metric's trend: green if improving, red if
+// worsening, neutral gray when there's no prior period to compare against.
+const colorForDelta = delta => !delta ? '#8892a4' : delta.positive ? P.green : P.red;
+
+function ExecKpiCard({ label, value, sub, color, delta }) {
+  return (
+    <div className="kpi" style={{ '--kc': color }}>
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value">{value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
+      {delta && (
+        <span className={`kpi-badge ${delta.positive ? 'bg' : 'rb'}`}>
+          {delta.pct > 0 ? '▲' : delta.pct < 0 ? '▼' : '→'} {Math.abs(delta.pct).toFixed(1)}% vs prev week
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function WeeklyTab({ daily, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
   const { currMon, prevMon, currWeek, prevWeek } = useMemo(() => {
@@ -28,9 +55,11 @@ export default function WeeklyTab({ daily, theme }) {
         const d = new Date(mon); d.setDate(mon.getDate()+i);
         const r = lk[isoDate(d)] || {};
         return { 
-          day:DAY_NAMES[i], 
-          sales:r.total_sales||0, 
-          inward:r.inward||0, 
+          day:DAY_NAMES[i],
+          sales:r.total_sales||0,
+          profit:r.profit||0,
+          mfgcost:r.mfgcost||0,
+          inward:r.inward||0,
           outward:r.outward||0, 
           wastage:r.wastage||0,
           gumming:r.gumming||0,
@@ -43,8 +72,10 @@ export default function WeeklyTab({ daily, theme }) {
           gm_qty:r.gm_qty||0,
           sl_qty:r.sl_qty||0,
           cl_qty:r.cl_qty||0,
+          cl_waste:r.cl_waste||0,
           dp_qty:r.dp_qty||0,
           rr_pcs:r.rr_pcs||0,
+          rr_waste:r.rr_waste||0,
           label_sales: r.label_sales || 0,
           dsales: r.dsales || 0,
           roll_sales: r.roll_sales || 0,
@@ -70,6 +101,33 @@ export default function WeeklyTab({ daily, theme }) {
     { label:'Die Punch',        color:'#8892a4', c:tot(currWeek,'diepunch'), p:tot(prevWeek,'diepunch'), qtyC: tot(currWeek,'dp_qty'),      qtyP: tot(prevWeek,'dp_qty')      },
     { label:'Ready Roll',       color:'#8892a4', c:tot(currWeek,'readyroll'),p:tot(prevWeek,'readyroll'),qtyC: tot(currWeek,'rr_pcs'),      qtyP: tot(prevWeek,'rr_pcs')      },
     { label:'Wastage',          color:P.yellow,  c:tot(currWeek,'wastage'),  p:tot(prevWeek,'wastage')  },
+  ];
+
+  const currTotal = tot(currWeek, 'sales');
+  const prevTotal = tot(prevWeek, 'sales');
+  const currProfit = tot(currWeek, 'profit');
+  const currMargin = currTotal > 0 ? Math.round(currProfit / currTotal * 1000) / 10 : 0;
+
+  const revDelta    = deltaFor(currTotal, prevTotal);
+  const profitDelta = deltaFor(currProfit, tot(prevWeek, 'profit'));
+  const costDelta   = deltaFor(tot(currWeek, 'mfgcost'), tot(prevWeek, 'mfgcost'), true);
+  const wastageDelta= deltaFor(tot(currWeek, 'wastage'), tot(prevWeek, 'wastage'), true);
+  const colorWasteDelta = deltaFor(tot(currWeek, 'cl_waste'), tot(prevWeek, 'cl_waste'), true);
+  const rrWasteDelta    = deltaFor(tot(currWeek, 'rr_waste'), tot(prevWeek, 'rr_waste'), true);
+
+  const execKpis = [
+    { label: 'Total Revenue', value: fmt(currTotal), sub: fmtRange(currMon), color: colorForDelta(revDelta),
+      delta: revDelta },
+    { label: 'Total Profit',  value: fmt(currProfit), sub: `${currMargin}% margin`, color: colorForDelta(profitDelta),
+      delta: profitDelta },
+    { label: 'Mfg Cost',      value: fmt(tot(currWeek, 'mfgcost')), sub: pct(tot(currWeek, 'mfgcost'), currTotal) + ' of revenue', color: colorForDelta(costDelta),
+      delta: costDelta },
+    { label: 'Total Wastage', value: fmt(tot(currWeek, 'wastage')), sub: pct(tot(currWeek, 'wastage'), currTotal) + ' of revenue', color: colorForDelta(wastageDelta),
+      delta: wastageDelta },
+    { label: 'Color Waste',      value: fmt(tot(currWeek, 'cl_waste')), sub: pct(tot(currWeek, 'cl_waste'), tot(currWeek, 'wastage')) + ' of wastage', color: colorForDelta(colorWasteDelta),
+      delta: colorWasteDelta },
+    { label: 'Ready Roll Waste', value: fmt(tot(currWeek, 'rr_waste')), sub: pct(tot(currWeek, 'rr_waste'), tot(currWeek, 'wastage')) + ' of wastage', color: colorForDelta(rrWasteDelta),
+      delta: rrWasteDelta },
   ];
 
   function badge(c,p) {
@@ -126,28 +184,23 @@ export default function WeeklyTab({ daily, theme }) {
         </div>
       </div>
 
+      <p className="section">Executive Summary</p>
+      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(6,minmax(0,1fr))' }}>
+        {execKpis.map(k => <ExecKpiCard key={k.label} {...k} />)}
+      </div>
+
       {/* Sales breakdown tiles */}
       <div className="charts-2">
         <div>
           {currSalesBreak.length > 0 && (
             <div className="kpi-grid" style={{ gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:10, marginBottom:16 }}>
               {currSalesBreak.map(s => (
-                <div key={s.k} className="kpi sales-green" style={{ '--kc':'#22c55e' }}>
+                <div key={s.k} className="kpi sales-today" style={{ '--kc':P.blue }}>
                   <div className="kpi-label">{s.k}</div>
-                  <div className="kpi-value">
-                    {s.amount != null ? fmt(s.amount) : '—'}
-                    {(() => {
-                      const prev = prevSalesBreak.find(x => x.k === s.k)?.amount || 0;
-                      if (prev === 0 && s.amount > 0) return <span className={`kpi-badge bg`}>New</span>;
-                      if (prev === 0) return null;
-                      const pct = (s.amount - prev) / prev * 100;
-                      const cls = pct > 0 ? 'bg' : pct < 0 ? 'rb' : '';
-                      return <span className={`kpi-badge ${cls}`}>{pct>0?'+':''}{pct.toFixed(1)}%</span>;
-                    })()}
-                  </div>
+                  <div className="kpi-value">{s.amount != null ? fmt(s.amount) : '—'}</div>
                   <div className="kpi-sub">
                     <div>
-                      Qty: {s.qty != null ? s.qty : '—'}
+                      Qty: {s.qty != null ? roundQty(s.qty) : '—'}
                       {['Label Sales','Direct Sales','Rolls Sales'].includes(s.k) && (() => {
                         const prevQty = prevSalesBreak.find(x => x.k === s.k)?.qty;
                         if (prevQty == null || prevQty === 0 || s.qty == null) return null;
@@ -158,6 +211,18 @@ export default function WeeklyTab({ daily, theme }) {
                     </div>
                     <div>Mfg: {s.mfg != null ? fmt(s.mfg) : '—'}</div>
                   </div>
+                  {(() => {
+                    const prev = prevSalesBreak.find(x => x.k === s.k)?.amount;
+                    if (prev == null) return null;
+                    if (prev === 0 && s.amount > 0) return <span className="kpi-badge bg">New</span>;
+                    const d = deltaFor(s.amount, prev);
+                    if (!d) return null;
+                    return (
+                      <span className={`kpi-badge ${d.positive ? 'bg' : 'rb'}`}>
+                        {d.pct > 0 ? '▲' : d.pct < 0 ? '▼' : '→'} {Math.abs(d.pct).toFixed(1)}% vs prev week
+                      </span>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -167,11 +232,11 @@ export default function WeeklyTab({ daily, theme }) {
           {prevSalesBreak.length > 0 && (
             <div className="kpi-grid" style={{ gridTemplateColumns:'repeat(3,minmax(0,1fr))', gap:10, marginBottom:16 }}>
               {prevSalesBreak.map(s => (
-                <div key={s.k} className="kpi sales-yellow" style={{ '--kc':'#f59e0b' }}>
+                <div key={s.k} className="kpi sales-yesterday" style={{ '--kc':P.yellow }}>
                   <div className="kpi-label">{s.k}</div>
                   <div className="kpi-value">{s.amount != null ? fmt(s.amount) : '—'}</div>
                   <div className="kpi-sub">
-                    <div>Qty: {s.qty != null ? s.qty : '—'}</div>
+                    <div>Qty: {s.qty != null ? roundQty(s.qty) : '—'}</div>
                     <div>Mfg: {s.mfg != null ? fmt(s.mfg) : '—'}</div>
                   </div>
                 </div>
@@ -200,11 +265,11 @@ export default function WeeklyTab({ daily, theme }) {
               <div className="wkpi-row">
                 <div>
                   <div className="wkpi-col-label">Qty</div>
-                  <div className="wkpi-col-val">{k.qtyC}</div>
+                  <div className="wkpi-col-val">{roundQty(k.qtyC)}</div>
                 </div>
                 <div>
                   <div className="wkpi-col-label">Qty</div>
-                  <div className="wkpi-col-val" style={{ color:'var(--muted)' }}>{k.qtyP}</div>
+                  <div className="wkpi-col-val" style={{ color:'var(--muted)' }}>{roundQty(k.qtyP)}</div>
                 </div>
               </div>
             )}

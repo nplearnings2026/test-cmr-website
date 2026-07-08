@@ -73,6 +73,8 @@ export function processRecords(records) {
       month: m, total: 0, label: 0, roll: 0, dsales: 0,
       mfgcost: 0, profit: 0, inward: 0, outward: 0, wastage: 0,
       inward_qty: 0, outward_qty: 0,
+      label_qty: 0, roll_qty: 0, dsales_qty: 0,
+      label_mfgcost: 0, roll_mfgcost: 0, dsales_mfgcost: 0,
       gumming: 0, slitting: 0, color: 0, diepunch: 0, readyroll: 0,
       gm_rolls:0, gm_qty:0,
       sl_rolls:0, sl_qty:0,
@@ -87,6 +89,8 @@ export function processRecords(records) {
     mo.dsales  += d.dsales;      mo.mfgcost += d.mfgcost;     mo.profit  += d.profit;
     mo.inward  += d.inward;      mo.outward += d.outward;     mo.wastage += d.wastage;
     mo.inward_qty  += d.inward_qty || 0; mo.outward_qty += d.outward_qty || 0;
+    mo.label_qty += d.label_qty || 0; mo.roll_qty += d.roll_qty || 0; mo.dsales_qty += d.dsales_qty || 0;
+    mo.label_mfgcost += d.label_mfgcost || 0; mo.roll_mfgcost += d.roll_mfgcost || 0; mo.dsales_mfgcost += d.dsales_mfgcost || 0;
     mo.gumming += d.gumming; mo.slitting += d.slitting; mo.color += d.color;
     mo.diepunch+= d.diepunch; mo.readyroll+= d.readyroll;
     mo.gm_rolls += d.gm_rolls; mo.gm_qty   += d.gm_qty;
@@ -118,13 +122,30 @@ export function processRecords(records) {
   });
 
   // ── Summary ──────────────────────────────────────────────────────────────
+  const best       = monthly.reduce((b, m) => m.total  > (b?.total  || 0) ? m : b, null);
+  const bestMargin = monthly.reduce((b, m) => m.margin > (b?.margin || 0) ? m : b, null);
+
+  const summary = {
+    ...summarizeDaily(daily),
+    best_month        : best?.month || '',
+    best_margin_month : bestMargin?.month || '',
+    date_range: {
+      from  : daily[0]?.date || '',
+      to    : daily[daily.length - 1]?.date || '',
+      days  : daily.length,
+      months: monthly.length,
+    },
+  };
+
+  return { summary, daily, monthly };
+}
+
+// ── Aggregate an arbitrary slice of daily records into a summary object ────
+export function summarizeDaily(daily) {
   const tot = f => daily.reduce((s, d) => s + (d[f] || 0), 0);
   const totalSales  = tot('total_sales');
   const totalProfit = tot('profit');
-  const best        = monthly.reduce((b, m) => m.total  > (b?.total  || 0) ? m : b, null);
-  const bestMargin  = monthly.reduce((b, m) => m.margin > (b?.margin || 0) ? m : b, null);
-
-  const summary = {
+  return {
     total_sales       : totalSales,
     total_profit      : totalProfit,
     total_mfgcost     : tot('mfgcost'),
@@ -142,21 +163,55 @@ export function processRecords(records) {
     total_color       : tot('color'),
     total_diepunch    : tot('diepunch'),
     total_readyroll   : tot('readyroll'),
-    // production detail totals
     gm_rolls  : tot('gm_rolls'),  gm_qty    : tot('gm_qty'),
     sl_rolls  : tot('sl_rolls'),  sl_qty    : tot('sl_qty'),
     cl_rolls  : tot('cl_rolls'),  cl_qty    : tot('cl_qty'),  cl_waste: tot('cl_waste'),
     dp_qty    : tot('dp_qty'),
     rr_rolls  : tot('rr_rolls'),  rr_pcs    : tot('rr_pcs'),  rr_waste: tot('rr_waste'),
-    best_month        : best?.month || '',
-    best_margin_month : bestMargin?.month || '',
     date_range: {
       from  : daily[0]?.date || '',
       to    : daily[daily.length - 1]?.date || '',
       days  : daily.length,
+      months: new Set(daily.map(d => d.date.slice(0, 7))).size,
+    },
+  };
+}
+
+// ── Aggregate an arbitrary slice of monthly rollups into a summary object ──
+export function summarizeMonthly(monthly) {
+  const sum = f => monthly.reduce((s, m) => s + (m[f] || 0), 0);
+  const totalSales  = sum('total');
+  const totalProfit = sum('profit');
+  const best       = monthly.reduce((b, m) => m.total  > (b?.total  || 0) ? m : b, null);
+  const bestMargin = monthly.reduce((b, m) => m.margin > (b?.margin || 0) ? m : b, null);
+  return {
+    total_sales       : totalSales,
+    total_profit      : totalProfit,
+    total_mfgcost     : sum('mfgcost'),
+    overall_margin    : totalSales > 0 ? round1(totalProfit / totalSales * 100) : 0,
+    total_label       : sum('label'),
+    total_roll        : sum('roll'),
+    total_dsales      : sum('dsales'),
+    total_inward      : sum('inward'),
+    total_outward     : sum('outward'),
+    total_wastage     : sum('wastage'),
+    total_gumming     : sum('gumming'),
+    total_slitting    : sum('slitting'),
+    total_color       : sum('color'),
+    total_diepunch    : sum('diepunch'),
+    total_readyroll   : sum('readyroll'),
+    gm_rolls  : sum('gm_rolls'),  gm_qty    : sum('gm_qty'),
+    sl_rolls  : sum('sl_rolls'),  sl_qty    : sum('sl_qty'),
+    cl_rolls  : sum('cl_rolls'),  cl_qty    : sum('cl_qty'),  cl_waste: sum('cl_waste'),
+    dp_qty    : sum('dp_qty'),
+    rr_rolls  : sum('rr_rolls'),  rr_pcs    : sum('rr_pcs'),  rr_waste: sum('rr_waste'),
+    best_month        : best?.month || '',
+    best_margin_month : bestMargin?.month || '',
+    date_range: {
+      from  : monthly[0] ? monthly[0].month + '-01' : '',
+      to    : monthly[monthly.length - 1]?.month || '',
+      days  : sum('days'),
       months: monthly.length,
     },
   };
-
-  return { summary, daily, monthly };
 }
