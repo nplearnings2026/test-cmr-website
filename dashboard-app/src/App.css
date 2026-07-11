@@ -65,7 +65,7 @@ h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 4px; }
 }
 .refresh-btn:hover:not(:disabled) { background: rgba(108,99,255,.2); border-color: rgba(108,99,255,.5); }
 .refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
-.refresh-time { font-size: .68rem; color: var(--muted); font-weight: 400; }
+.refresh-time { font-size: .8rem; color: #00d4aa; font-weight: 500; }
 
 .theme-toggle {
   display: flex;

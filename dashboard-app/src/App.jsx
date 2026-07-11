@@ -131,16 +131,22 @@ export default function App() {
           )}
         </div>
         <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
-            {theme === 'dark' ? '☀ Light' : '☾ Dark'}
-          </button>
-          <button className="refresh-btn" onClick={() => fetchData(true)} disabled={loading}>
-            <span className="refresh-icon">⟳</span>
-            {loading ? 'Loading…' : 'Refresh'}
-            {updatedAt && !loading && (
-              <span className="refresh-time">{updatedAt.toLocaleTimeString()}</span>
+          <div style={{ display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4 }}>
+            <div style={{ display:'flex', gap:8 }}>
+              <button className="refresh-btn" onClick={() => fetchData(true)} disabled={loading}>
+                <span className="refresh-icon">⟳</span>
+                {loading ? 'Loading…' : 'Refresh'}
+              </button>
+              <button className="theme-toggle" onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}>
+                {theme === 'dark' ? '☀ Light' : '☾ Dark'}
+              </button>
+            </div>
+            {filtered && !loading && (
+              <span className="refresh-time">
+                Data up to {filtered.summary.date_range.to}
+              </span>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
