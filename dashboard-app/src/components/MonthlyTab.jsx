@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Bar, Line } from 'react-chartjs-2';
 import { fmt, monthLabel, P, MONTH_COLORS, getChartTheme } from '../utils/format';
 
@@ -21,7 +22,7 @@ const deltaFor = (curr, prev, invert = false) => {
 // worsening, neutral gray when there's no prior period to compare against.
 const colorForDelta = delta => !delta ? '#8892a4' : delta.positive ? P.green : P.red;
 
-function ExecKpiCard({ label, value, sub, color, delta }) {
+function ExecKpiCard({ label, value, sub, color, delta, deltaLabel = 'vs prior month' }) {
   return (
     <div className="kpi" style={{ '--kc': color }}>
       <div className="kpi-label">{label}</div>
@@ -29,7 +30,7 @@ function ExecKpiCard({ label, value, sub, color, delta }) {
       {sub && <div className="kpi-sub">{sub}</div>}
       {delta && (
         <span className={`kpi-badge ${delta.positive ? 'bg' : 'rb'}`}>
-          {delta.pct > 0 ? '▲' : delta.pct < 0 ? '▼' : '→'} {Math.abs(delta.pct).toFixed(1)}% vs prior month
+          {delta.pct > 0 ? '▲' : delta.pct < 0 ? '▼' : '→'} {Math.abs(delta.pct).toFixed(1)}% {deltaLabel}
         </span>
       )}
     </div>
@@ -47,6 +48,7 @@ function MetricTile({ color, title, children }) {
 
 export default function MonthlyTab({ monthly, fullMonthly, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
+  const [monthOffset, setMonthOffset] = useState(0); // 0 = latest month
   const labels = monthly.map(m => monthLabel(m.month));
 
   // ── Shared options ───────────────────────────────────────────────────
@@ -131,12 +133,13 @@ export default function MonthlyTab({ monthly, fullMonthly, theme }) {
   const maxOf  = f => Math.max(...monthly.map(m => m[f]), 1);
   const pct100 = (v, mx) => Math.min(100, Math.round(v / mx * 100));
 
-  // ── Executive summary — latest month in scope vs the one before it ────
-  const latestMonth = monthly.length ? monthly[monthly.length - 1] : null;
-  // Look up the true prior calendar month from the full (unfiltered) dataset,
-  // since `monthly` may be scoped down to a single selected month.
-  const prevMonthKey = latestMonth ? shiftMonth(latestMonth.month, -1) : null;
-  const prevMonth = prevMonthKey ? (fullMonthly || monthly).find(m => m.month === prevMonthKey) : null;
+  // ── Monthly navigation ────────────────────────────────────────────────
+  const allMonths    = (fullMonthly?.length ? fullMonthly : monthly);
+  const selMonthIdx  = allMonths.length - 1 + monthOffset;
+  const latestMonth  = allMonths[selMonthIdx]     || null;
+  const prevMonth    = allMonths[selMonthIdx - 1] || null;
+  const hasPrevMonth = selMonthIdx > 0;
+  const hasNextMonth = monthOffset < 0;
   const revDelta    = latestMonth ? deltaFor(latestMonth.total, prevMonth?.total) : null;
   const profitDelta = latestMonth ? deltaFor(latestMonth.profit, prevMonth?.profit) : null;
   const costDelta   = latestMonth ? deltaFor(latestMonth.mfgcost, prevMonth?.mfgcost, true) : null;
@@ -195,6 +198,24 @@ export default function MonthlyTab({ monthly, fullMonthly, theme }) {
 
   return (
     <div>
+      {/* ── Monthly navigation (always at top, same layout as Daily/Weekly) ── */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+        <button className="week-nav-btn" onClick={() => setMonthOffset(o => o-1)} disabled={!hasPrevMonth}>&#8592; Prev Month</button>
+        <div className="weekly-header" style={{ flex:1, marginBottom:0 }}>
+          <div className="week-badge week-badge-curr">
+            <div className="week-badge-label">{monthOffset === 0 ? 'Latest Month' : 'Selected Month'}</div>
+            <div className="week-badge-dates">{latestMonth ? monthLabel(latestMonth.month) : '—'}</div>
+          </div>
+          {prevMonth && (
+            <div className="week-badge week-badge-prev">
+              <div className="week-badge-label">Previous Month</div>
+              <div className="week-badge-dates">{monthLabel(prevMonth.month)}</div>
+            </div>
+          )}
+        </div>
+        <button className="week-nav-btn" onClick={() => setMonthOffset(o => o+1)} disabled={!hasNextMonth}>Next Month &#8594;</button>
+      </div>
+
       {execKpis.length > 0 && (
         <>
           <p className="section">Executive Summary</p>

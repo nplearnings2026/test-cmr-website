@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState } from 'react';
 import { fmt, P } from '../utils/format';
 
 const pct = (n, d) => d > 0 ? (n / d * 100).toFixed(1) + '%' : '—';
@@ -29,11 +29,15 @@ function KpiCard({ label, value, sub, color, delta }) {
 }
 
 export default function DailyTab({ summary, daily, rawDaily }) {
+  const [dayOffset, setDayOffset] = useState(0); // 0 = latest day
+
   const sourceDaily = (rawDaily && rawDaily.length) ? rawDaily : daily;
   const sortedDaily = sourceDaily ? [...sourceDaily].sort((a, b) => a.date.localeCompare(b.date)) : [];
-  const latestDay = sortedDaily.length ? sortedDaily[sortedDaily.length - 1] : null;
-  const yesterdayDay = sortedDaily.length > 1 ? sortedDaily[sortedDaily.length - 2] : null;
-  const prevForYesterday = sortedDaily.length > 2 ? sortedDaily[sortedDaily.length - 3] : null;
+  const selIdx       = sortedDaily.length - 1 + dayOffset;
+  const latestDay    = sortedDaily[selIdx]     || null;
+  const yesterdayDay = sortedDaily[selIdx - 1] || null;
+  const hasPrev      = selIdx > 0;
+  const hasNext      = dayOffset < 0;
 
   // Production & logistics — one tile per category, Today vs Yesterday side by side
   // (mirrors WeeklyTab's wkpi-grid Current/Prev Week tiles)
@@ -91,15 +95,19 @@ export default function DailyTab({ summary, daily, rawDaily }) {
 
   return (
     <div>
-      <div className="weekly-header">
-        <div className="week-badge week-badge-curr">
-          <div className="week-badge-label">Today — Daily &amp; Production</div>
-          <div className="week-badge-dates">{latestDay ? latestDay.date : ''}</div>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+        <button className="week-nav-btn" onClick={() => setDayOffset(o => o-1)} disabled={!hasPrev}>&#8592; Prev Day</button>
+        <div className="weekly-header" style={{ flex:1, marginBottom:0 }}>
+          <div className="week-badge week-badge-curr">
+            <div className="week-badge-label">{dayOffset === 0 ? 'Latest Day' : 'Selected Day'}</div>
+            <div className="week-badge-dates">{latestDay ? latestDay.date : '—'}</div>
+          </div>
+          <div className="week-badge week-badge-prev">
+            <div className="week-badge-label">Previous Day</div>
+            <div className="week-badge-dates">{yesterdayDay ? yesterdayDay.date : '—'}</div>
+          </div>
         </div>
-        <div className="week-badge week-badge-prev">
-          <div className="week-badge-label">Yesterday — Daily &amp; Production</div>
-          <div className="week-badge-dates">{yesterdayDay ? yesterdayDay.date : ''}</div>
-        </div>
+        <button className="week-nav-btn" onClick={() => setDayOffset(o => o+1)} disabled={!hasNext}>Next Day &#8594;</button>
       </div>
 
       {execKpis.length > 0 && (

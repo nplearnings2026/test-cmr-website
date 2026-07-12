@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { fmt, P, getChartTheme } from '../utils/format';
 
@@ -40,11 +40,16 @@ function ExecKpiCard({ label, value, sub, color, delta }) {
 
 export default function WeeklyTab({ daily, theme }) {
   const { GRID, TICK, LEG, BASE_TIP } = getChartTheme(theme);
-  const { currMon, prevMon, currWeek, prevWeek } = useMemo(() => {
-    const latest = daily.reduce((m,r) => r.date > m ? r.date : m, '');
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = latest week, -1 = one week back, etc.
+
+  const { currMon, prevMon, currWeek, prevWeek, hasPrev, hasNext } = useMemo(() => {
+    const latest   = daily.reduce((m,r) => r.date > m ? r.date : m, '');
+    const earliest = daily.reduce((m,r) => r.date < m ? r.date : m, latest);
     const ld = new Date(latest + 'T00:00:00');
     const fromMon = ld.getDay()===0 ? 6 : ld.getDay()-1;
-    const currMon = new Date(ld); currMon.setDate(ld.getDate()-fromMon);
+    const latestMon = new Date(ld); latestMon.setDate(ld.getDate()-fromMon);
+
+    const currMon = new Date(latestMon); currMon.setDate(latestMon.getDate() + weekOffset * 7);
     const prevMon = new Date(currMon); prevMon.setDate(currMon.getDate()-7);
 
     const lk = {};
@@ -88,8 +93,10 @@ export default function WeeklyTab({ daily, theme }) {
         };
       });
     }
-    return { currMon, prevMon, currWeek:slice(currMon), prevWeek:slice(prevMon) };
-  }, [daily]);
+    const hasNext = weekOffset < 0;
+    const hasPrev = isoDate(prevMon) >= earliest;
+    return { currMon, prevMon, currWeek:slice(currMon), prevWeek:slice(prevMon), hasPrev, hasNext };
+  }, [daily, weekOffset]);
 
   const tot = (w,k) => w.reduce((s,d) => s+d[k], 0);
   const kpis = [
@@ -172,16 +179,20 @@ export default function WeeklyTab({ daily, theme }) {
 
   return (
     <div>
-      {/* Week badges */}
-      <div className="weekly-header">
-        <div className="week-badge week-badge-curr">
-          <div className="week-badge-label">Current Week</div>
-          <div className="week-badge-dates">{fmtRange(currMon)}</div>
+      {/* Week nav + badges */}
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20 }}>
+        <button className="week-nav-btn" onClick={() => setWeekOffset(o => o - 1)} disabled={!hasPrev}>&#8592; Prev</button>
+        <div className="weekly-header" style={{ flex:1, marginBottom:0 }}>
+          <div className="week-badge week-badge-curr">
+            <div className="week-badge-label">{weekOffset === 0 ? 'Current Week' : `Week (${weekOffset})`}</div>
+            <div className="week-badge-dates">{fmtRange(currMon)}</div>
+          </div>
+          <div className="week-badge week-badge-prev">
+            <div className="week-badge-label">Previous Week</div>
+            <div className="week-badge-dates">{fmtRange(prevMon)}</div>
+          </div>
         </div>
-        <div className="week-badge week-badge-prev">
-          <div className="week-badge-label">Previous Week</div>
-          <div className="week-badge-dates">{fmtRange(prevMon)}</div>
-        </div>
+        <button className="week-nav-btn" onClick={() => setWeekOffset(o => o + 1)} disabled={!hasNext}>Next &#8594;</button>
       </div>
 
       <p className="section">Executive Summary</p>
